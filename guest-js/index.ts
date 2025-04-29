@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export async function get_user_info(value: string): Promise<UserInfo | null> {
+export async function getUserData(value: string): Promise<UserInfo | null> {
   return await invoke<{value?: UserInfo}>('plugin:user-data|get_user_info', {
     payload: {
       value,
