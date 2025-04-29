@@ -23,12 +23,3 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 
 /// Access to the user-data APIs.
 pub struct UserData<R: Runtime>(PluginHandle<R>);
-
-impl<R: Runtime> UserData<R> {
-  pub fn ping(&self, payload: PingRequest) -> crate::Result<PingResponse> {
-    self
-      .0
-      .run_mobile_plugin("ping", payload)
-      .map_err(Into::into)
-  }
-}

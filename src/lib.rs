@@ -3,8 +3,6 @@ use tauri::{
   Manager, Runtime,
 };
 
-pub use models::*;
-
 #[cfg(desktop)]
 mod desktop;
 #[cfg(mobile)]
@@ -12,7 +10,6 @@ mod mobile;
 
 mod commands;
 mod error;
-mod models;
 
 pub use error::{Error, Result};
 
@@ -35,7 +32,7 @@ impl<R: Runtime, T: Manager<R>> crate::UserDataExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
   Builder::new("user-data")
-    .invoke_handler(tauri::generate_handler![commands::ping])
+    .invoke_handler(tauri::generate_handler![commands::get_user_info])
     .setup(|app, api| {
       #[cfg(mobile)]
       let user_data = mobile::init(app, api)?;
