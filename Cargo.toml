@@ -1,18 +1,18 @@
 [package]
 name = "tauri-plugin-user-data"
 version = "0.1.0"
-authors = [ "You" ]
-description = ""
+authors = ["Joaquin (Pato) Decima <jdecima@vasak.net.ar>", "Vasak Group"]
+description = "User Data API for Tauri aplications (Created for VasakOS)"
 edition = "2021"
 rust-version = "1.77.2"
 exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
 links = "tauri-plugin-user-data"
 
 [dependencies]
-tauri = { version = "2.5.0" }
+tauri = { version = "2" }
 serde = "1.0"
 thiserror = "2"
 base64 = "0.21.1"
 
 [build-dependencies]
-tauri-plugin = { version = "2.2.0", features = ["build"] }
+tauri-plugin = { version = "2", features = ["build"] }
