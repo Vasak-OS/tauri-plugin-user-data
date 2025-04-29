@@ -1,9 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export async function ping(value: string): Promise<string | null> {
-  return await invoke<{value?: string}>('plugin:user-data|ping', {
+export async function get_user_info(value: string): Promise<UserInfo | null> {
+  return await invoke<{value?: UserInfo}>('plugin:user-data|get_user_info', {
     payload: {
       value,
     },
   }).then((r) => (r.value ? r.value : null));
+}
+
+export interface UserInfo {
+  username: string;
+  full_name: string;
+  avatar_data: string;
 }
