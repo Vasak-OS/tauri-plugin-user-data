@@ -17,7 +17,7 @@ tauri-plugin-user-data = { git = "https://github.com/Vasak-OS/tauri-plugin-user-
 In `main.rs` or `lib.rs`, add the following to your `tauri::Builder`:
 
 ```rust
-use tauri_plugin_user_data::UserDataPlugin;
+use tauri_plugin_user_data;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_user_data::init()) // this line
