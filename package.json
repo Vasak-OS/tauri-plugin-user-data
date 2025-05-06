@@ -1,5 +1,5 @@
 {
-  "name": "@vasakgroup/plugin-user-data-api",
+  "name": "@vasakgroup/plugin-user-data",
   "version": "0.1.0",
   "author":  "Joaquin (Pato) Decima <joaquin.decima@vasak.net.ar>",
   "description": "A plugin for user data management in Tauri applications.",
