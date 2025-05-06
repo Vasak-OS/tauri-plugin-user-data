@@ -305,6 +305,12 @@
           "type": "string",
           "const": "deny-get-user-info",
           "markdownDescription": "Denies the get_user_info command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-user-info`",
+          "type": "string",
+          "const": "default",
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-user-info`"
         }
       ]
     }

@@ -4,7 +4,7 @@ Default permissions for the plugin
 
 #### This default permission set includes the following:
 
-- `allow-ping`
+- `allow-get-user-info`
 
 ## Permission Table
 
@@ -37,32 +37,6 @@ Enables the get_user_info command without any pre-configured scope.
 <td>
 
 Denies the get_user_info command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`user-data:allow-ping`
-
-</td>
-<td>
-
-Enables the ping command without any pre-configured scope.
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-`user-data:deny-ping`
-
-</td>
-<td>
-
-Denies the ping command without any pre-configured scope.
 
 </td>
 </tr>
