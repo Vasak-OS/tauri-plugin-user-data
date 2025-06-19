@@ -1,12 +1,16 @@
 [package]
 name = "tauri-plugin-user-data"
-version = "0.1.0"
+version = "2.0.0"
 authors = ["Joaquin (Pato) Decima <jdecima@vasak.net.ar>", "Vasak Group"]
 description = "User Data API for Tauri aplications (Created for VasakOS)"
 edition = "2021"
 rust-version = "1.77.2"
 exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
 links = "tauri-plugin-user-data"
+repository = "https://github.com/Vasak-OS/tauri-plugin-user-data"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+keywords = ["tauri", "plugin", "user-data", "vasakos", "linux", "desktop", "application", "data", "vasak"]
 
 [dependencies]
 tauri = { version = "2" }
