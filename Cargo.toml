@@ -11,7 +11,7 @@ repository = "https://github.com/Vasak-OS/tauri-plugin-user-data"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-file = "LICENSE"
-keywords = ["tauri", "plugin", "user-data", "vasakos", "linux", "desktop", "application", "data", "vasak"]
+keywords = ["tauri", "plugin", "user-data", "vasakos", "linux"]
 
 [dependencies]
 tauri = { version = "2" }
