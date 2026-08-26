@@ -57,7 +57,7 @@ fn get_user_avatar(username: &str) -> Result<String, String> {
 
     for path in avatar_paths {
         if let Ok(data) = fs::read(&path) {
-            let mime_type = match path.split('.').last() {
+            let mime_type = match path.split('.').next_back() {
                 Some("png") => "image/png",
                 Some("jpg") | Some("jpeg") => "image/jpeg",
                 Some("svg") => "image/svg+xml",
