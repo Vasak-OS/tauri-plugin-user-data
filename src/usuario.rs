@@ -134,29 +134,39 @@ fn leer_hasta(ruta: &Path, limite: u64) -> Option<Vec<u8>> {
 
 /// El nombre de la cuenta, sin depender del entorno.
 ///
-/// `USER` primero porque es lo normal, pero **con salida**: una aplicación lanzada
-/// desde una unidad de systemd puede no tenerla puesta, y ahí la versión anterior
-/// fallaba entera y el panel quedaba sin nombre, sin foto y sin nada. El uid
-/// siempre está.
-pub fn nombre_de_la_cuenta() -> Option<String> {
+/// Tres fuentes, en orden, y **siempre devuelve algo**: `USER`, el `passwd` por
+/// uid, y el uid como número. `USER` primero porque es lo normal, pero con salida:
+/// una aplicación lanzada desde una unidad de systemd puede no tenerla puesta, y
+/// ahí la versión anterior fallaba entera. Y el uid al final porque devolver nada
+/// deja al panel sin nombre, sin foto y sin directorio por no poder poner una
+/// etiqueta.
+pub fn nombre_de_la_cuenta() -> String {
     if let Ok(usuario) = std::env::var("USER") {
         if !usuario.trim().is_empty() {
-            return Some(usuario);
+            return usuario;
         }
     }
 
     // `getpwuid` no es reentrante, pero esto corre una vez al arrancar y desde un
     // solo hilo.
-    unsafe {
+    let del_passwd = unsafe {
         let entrada = libc::getpwuid(libc::getuid());
         if entrada.is_null() {
-            return None;
+            None
+        } else {
+            CStr::from_ptr((*entrada).pw_name)
+                .to_str()
+                .ok()
+                .map(|s| s.to_string())
         }
-        CStr::from_ptr((*entrada).pw_name)
-            .to_str()
-            .ok()
-            .map(|s| s.to_string())
-    }
+    };
+
+    // Y si el `passwd` no resuelve la cuenta —no hay entrada, o el nombre no es
+    // UTF-8— queda el uid como número. No es lindo, pero es cierto, y `getent
+    // passwd 1000` lo resuelve igual. La alternativa era devolver nada, y entonces
+    // el panel del escritorio se queda sin nombre, sin foto y sin directorio por no
+    // poder poner una etiqueta.
+    del_passwd.unwrap_or_else(|| unsafe { libc::getuid() }.to_string())
 }
 
 #[cfg(test)]
@@ -296,7 +306,27 @@ mod tests {
     fn siempre_hay_un_nombre_de_cuenta() {
         // Aunque `USER` no esté: una aplicación lanzada desde una unidad de systemd
         // puede no tenerla, y antes fallaba entera y el panel quedaba sin nada.
-        assert!(nombre_de_la_cuenta().is_some_and(|n| !n.is_empty()));
+        let n = nombre_de_la_cuenta();
+        assert!(!n.is_empty());
+        assert!(!n.contains('\0'));
+    }
+
+    #[test]
+    fn el_uid_es_la_ultima_fuente_y_no_falla_nunca() {
+        // Si el `passwd` no resuelve la cuenta, el uid como número es cierto y
+        // sirve: `getent passwd 1000` lo resuelve igual. Devolver nada dejaba al
+        // panel sin nada por no poder poner una etiqueta.
+        let previo = std::env::var_os("USER");
+        let _guardia = GUARDIA.lock().unwrap();
+        unsafe { std::env::remove_var("USER") };
+
+        let n = nombre_de_la_cuenta();
+        assert!(!n.is_empty(), "sin USER tiene que resolver igual");
+
+        match previo {
+            Some(v) => unsafe { std::env::set_var("USER", v) },
+            None => unsafe { std::env::remove_var("USER") },
+        }
     }
 
     /// Un PNG de 1x1 de verdad.
@@ -365,4 +395,8 @@ mod tests {
         assert!(url.len() > "data:image/png;base64,".len());
         let _ = std::fs::remove_dir_all(&base);
     }
+
+    /// El entorno es global al proceso, así que las pruebas que lo tocan van de a
+    /// una: sin esto, una prueba le saca la variable a otra a mitad de camino.
+    static GUARDIA: std::sync::Mutex<()> = std::sync::Mutex::new(());
 }

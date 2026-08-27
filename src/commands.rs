@@ -29,8 +29,8 @@ pub struct UserInfo {
 /// está, y el directorio sale del `passwd` con `HOME` como respaldo.
 #[tauri::command]
 pub fn get_user_info() -> Result<UserInfo, String> {
-    let username = usuario::nombre_de_la_cuenta()
-        .ok_or_else(|| "no se pudo determinar la cuenta de la sesión".to_string())?;
+    // Siempre devuelve algo: `USER`, el `passwd`, o el uid como número.
+    let username = usuario::nombre_de_la_cuenta();
 
     // La línea de `passwd`. Si no se puede leer, se sigue con lo que haya: quedarse
     // sin panel por no saber el nombre completo sería peor que mostrar la cuenta.
