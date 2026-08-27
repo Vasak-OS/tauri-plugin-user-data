@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-user-data"
-version = "2.0.1"
+version = "2.1.0"
 authors = ["Joaquin (Pato) Decima <jdecima@vasak.net.ar>", "Vasak Group"]
 description = "User Data API for Tauri aplications (Created for VasakOS)"
 edition = "2021"
@@ -17,6 +17,7 @@ tauri = { version = "2" }
 serde = "1"
 thiserror = "2"
 base64 = "0.22"
+libc = "0.2.189"
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }

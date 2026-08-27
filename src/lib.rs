@@ -9,6 +9,7 @@ mod desktop;
 mod mobile;
 
 mod commands;
+mod usuario;
 mod error;
 
 pub use error::{Error, Result};

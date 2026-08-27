@@ -1,9 +1,16 @@
-use base64::Engine as _;
+//! Lo que la interfaz puede preguntar sobre la persona que usa la sesión.
+
 use serde::Serialize;
-use std::env;
-use std::fs;
 use std::process::Command;
 use std::str::from_utf8;
+
+use crate::usuario::{self, LIMITE_AVATAR};
+
+/// El icono genérico, para cuando no hay ninguna foto.
+///
+/// Va empotrado y no como ruta a un archivo del tema: si el tema no lo tiene, el
+/// panel del escritorio se queda con un hueco donde va la cara.
+const AVATAR_DE_RESERVA: &str = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAyMXYtMmE0IDQgMCAwIDAtNC00SDhhNCA0IDAgMCAwLTQgNHYyIj48L3BhdGg+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ij48L2NpcmNsZT48L3N2Zz4=";
 
 #[derive(Debug, Serialize, Clone)]
 pub struct UserInfo {
@@ -13,29 +20,37 @@ pub struct UserInfo {
     home_dir: String,
 }
 
+/// Quién es y cómo se ve.
+///
+/// **No falla si el entorno está incompleto.** Antes leía `USER` con `?`, así que
+/// una aplicación lanzada desde una unidad de systemd —donde esa variable puede no
+/// estar— se quedaba sin nombre, sin foto y sin directorio: el panel del escritorio
+/// entero sin datos. Ahora el uid es la fuente de última instancia, que siempre
+/// está, y el directorio sale del `passwd` con `HOME` como respaldo.
 #[tauri::command]
 pub fn get_user_info() -> Result<UserInfo, String> {
-    let username = env::var("USER").map_err(|e| format!("Error getting username: {}", e))?;
+    let username = usuario::nombre_de_la_cuenta()
+        .ok_or_else(|| "no se pudo determinar la cuenta de la sesión".to_string())?;
 
-    let output = Command::new("getent")
+    // La línea de `passwd`. Si no se puede leer, se sigue con lo que haya: quedarse
+    // sin panel por no saber el nombre completo sería peor que mostrar la cuenta.
+    let linea = Command::new("getent")
         .args(["passwd", &username])
         .output()
-        .map_err(|e| format!("Error executing getent: {}", e))?;
+        .ok()
+        .and_then(|salida| from_utf8(&salida.stdout).ok().map(|t| t.to_string()))
+        .unwrap_or_default();
 
-    let passwd_entry =
-        from_utf8(&output.stdout).map_err(|e| format!("Invalid UTF-8 in output: {}", e))?;
+    let full_name = usuario::nombre_completo_de(&linea, &username);
+    let home_dir = usuario::hogar_de(&linea)
+        .or_else(|| std::env::var("HOME").ok())
+        .unwrap_or_default();
 
-    let full_name = passwd_entry
-        .split(':')
-        .nth(4)
-        .unwrap_or(&username)
-        .split(',')
-        .next()
-        .unwrap_or(&username)
-        .to_string();
-
-    let avatar_data = get_user_avatar(&username)?;
-    let home_dir = env::var("HOME").unwrap_or_default();
+    let avatar_data = usuario::avatar_de(
+        &usuario::rutas_de_avatar(&home_dir, &username),
+        LIMITE_AVATAR,
+    )
+    .unwrap_or_else(|| AVATAR_DE_RESERVA.to_string());
 
     Ok(UserInfo {
         username,
@@ -45,30 +60,29 @@ pub fn get_user_info() -> Result<UserInfo, String> {
     })
 }
 
-fn get_user_avatar(username: &str) -> Result<String, String> {
-    let home_dir = env::var("HOME").unwrap_or_default();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let avatar_paths = vec![
-        format!("{}/.face", home_dir),
-        format!("/var/lib/AccountsService/icons/{}", username),
-        "/usr/share/icons/default/user.png".to_string(),
-        "/usr/share/icons/gnome/scalable/apps/system-users-symbolic.svg".to_string(),
-    ];
-
-    for path in avatar_paths {
-        if let Ok(data) = fs::read(&path) {
-            let mime_type = match path.split('.').next_back() {
-                Some("png") => "image/png",
-                Some("jpg") | Some("jpeg") => "image/jpeg",
-                Some("svg") => "image/svg+xml",
-                _ => "image/png",
-            };
-
-            // Convertir a base64
-            let base64 = base64::engine::general_purpose::STANDARD.encode(&data);
-            return Ok(format!("data:{};base64,{}", mime_type, base64));
-        }
+    #[test]
+    fn siempre_se_devuelve_algo_utilizable() {
+        // El panel del escritorio pide esto al arrancar: si falla, no muestra nada.
+        let info = get_user_info().expect("tiene que resolver");
+        assert!(!info.username.is_empty());
+        assert!(!info.full_name.is_empty(), "al menos el nombre de la cuenta");
+        assert!(info.avatar_data.starts_with("data:image/"), "{}", info.avatar_data);
+        assert!(!info.home_dir.is_empty());
     }
 
-    Ok("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMCAyMXYtMmE0IDQgMCAwIDAtNC00SDhhNCA0IDAgMCAwLTQgNHYyIj48L3BhdGg+PGNpcmNsZSBjeD0iMTIiIGN5PSI3IiByPSI0Ij48L2NpcmNsZT48L3N2Zz4=".to_string())
+    #[test]
+    fn el_avatar_de_reserva_es_una_imagen_valida() {
+        // Si estuviera mal, todo el mundo sin foto vería un hueco.
+        assert!(AVATAR_DE_RESERVA.starts_with("data:image/svg+xml;base64,"));
+        let carga = AVATAR_DE_RESERVA.trim_start_matches("data:image/svg+xml;base64,");
+        let bytes = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, carga)
+            .expect("base64 válido");
+        let texto = String::from_utf8(bytes).expect("utf-8");
+        assert!(texto.contains("<svg"), "{texto}");
+        assert!(texto.contains("</svg>"));
+    }
 }
