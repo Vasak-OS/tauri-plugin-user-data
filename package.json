@@ -1,6 +1,6 @@
 {
   "name": "@vasakgroup/plugin-user-data",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author":  "Joaquin (Pato) Decima <jdecima@vasak.net.ar>",
   "description": "A plugin for user data management in Tauri applications.",
   "type": "module",
@@ -32,6 +32,9 @@
   },
   "repository": {"url": "https://github.com/Vasak-OS/tauri-plugin-user-data/", "type": "git"},
   "license": "GPLv3",
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "tauri",
     "plugin",
