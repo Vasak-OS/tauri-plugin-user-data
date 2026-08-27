@@ -6,7 +6,7 @@
 //! hueco donde va la foto.
 
 use std::ffi::CStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Hasta qué tamaño se lee un avatar.
 ///
@@ -43,34 +43,37 @@ pub fn hogar_de(linea_de_passwd: &str) -> Option<String> {
 /// tienen extensión —`~/.face` y el icono de AccountsService, que se llama como la
 /// cuenta— así que mirando el nombre siempre salía «image/png», y un `.face` que
 /// en realidad es JPEG no se dibujaba: el hueco de la foto quedaba vacío.
-pub fn mime_de(bytes: &[u8]) -> &'static str {
+///
+/// `None` para lo que no se reconoce, y **eso importa**: declarar cualquier cosa
+/// como PNG hacía que un `.face` dañado o que no es una imagen se aceptara igual,
+/// y con él aceptado se dejaba de buscar. Un `.face.icon` bueno, o el avatar del
+/// sistema, quedaban tapados por un archivo que no se puede dibujar.
+pub fn mime_de(bytes: &[u8]) -> Option<&'static str> {
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G'];
     if bytes.starts_with(PNG) {
-        return "image/png";
+        return Some("image/png");
     }
     if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        return "image/jpeg";
+        return Some("image/jpeg");
     }
     if bytes.starts_with(b"GIF8") {
-        return "image/gif";
+        return Some("image/gif");
     }
     if bytes.starts_with(b"BM") {
-        return "image/bmp";
+        return Some("image/bmp");
     }
     if bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP" {
-        return "image/webp";
+        return Some("image/webp");
     }
     // El SVG es texto y puede empezar con la declaración XML, con un comentario o
     // con espacios, así que se busca la etiqueta en el principio del archivo.
     let principio = &bytes[..bytes.len().min(512)];
     if let Ok(texto) = std::str::from_utf8(principio) {
         if texto.contains("<svg") {
-            return "image/svg+xml";
+            return Some("image/svg+xml");
         }
     }
-    // Lo que no se reconoce se declara como PNG, que es lo que había antes: el
-    // motor igual olfatea el contenido, y declarar algo es mejor que nada.
-    "image/png"
+    None
 }
 
 /// Dónde puede estar la foto de la cuenta, en orden.
@@ -93,20 +96,40 @@ pub fn rutas_de_avatar(hogar: &str, usuario: &str) -> Vec<PathBuf> {
 /// pone el de reserva.
 pub fn avatar_de(rutas: &[PathBuf], limite: u64) -> Option<String> {
     for ruta in rutas {
-        let cabe = std::fs::metadata(ruta)
-            .map(|m| m.is_file() && m.len() > 0 && m.len() <= limite)
-            .unwrap_or(false);
-        if !cabe {
+        // Regular y no vacío. El tamaño **no** se decide acá: `metadata` y `read`
+        // miran el archivo en momentos distintos, así que si crece o lo reemplazan
+        // en el medio se leería y codificaría más que el límite, y el límite de
+        // memoria y de tamaño del mensaje dejaría de existir.
+        if !std::fs::metadata(ruta).map(|m| m.is_file()).unwrap_or(false) {
             continue;
         }
-        let Ok(datos) = std::fs::read(ruta) else {
+
+        let Some(datos) = leer_hasta(ruta, limite) else {
             continue;
         };
-        let mime = mime_de(&datos);
+        // El tipo decide si sirve: lo que no se reconoce se saltea para seguir
+        // buscando, en lugar de aceptarse como PNG y tapar una ruta buena.
+        let Some(mime) = mime_de(&datos) else {
+            continue;
+        };
         let base64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &datos);
         return Some(format!("data:{mime};base64,{base64}"));
     }
     None
+}
+
+/// Lee un archivo entero si entra en `limite`, o `None` si lo pasa.
+///
+/// Se lee `limite + 1` para poder distinguir «entra justo» de «se cortó», que es
+/// la única forma de no aceptar un archivo truncado como si fuera el entero. Y el
+/// tope se aplica **al leer**, así que no importa si el archivo cambia de tamaño
+/// entre la comprobación y la lectura.
+fn leer_hasta(ruta: &Path, limite: u64) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let archivo = std::fs::File::open(ruta).ok()?;
+    let mut datos = Vec::new();
+    archivo.take(limite.saturating_add(1)).read_to_end(&mut datos).ok()?;
+    (!datos.is_empty() && datos.len() as u64 <= limite).then_some(datos)
 }
 
 /// El nombre de la cuenta, sin depender del entorno.
@@ -177,38 +200,75 @@ mod tests {
     fn el_tipo_se_saca_del_contenido_y_no_del_nombre() {
         // Dos de las cuatro rutas de avatar no tienen extensión, así que mirando el
         // nombre siempre salía «image/png» y un JPEG no se dibujaba.
-        assert_eq!(mime_de(&[0x89, b'P', b'N', b'G', 0x0D]), "image/png");
-        assert_eq!(mime_de(&[0xFF, 0xD8, 0xFF, 0xE0]), "image/jpeg");
-        assert_eq!(mime_de(b"GIF89a..."), "image/gif");
-        assert_eq!(mime_de(b"BM..."), "image/bmp");
-        assert_eq!(mime_de(b"RIFF\0\0\0\0WEBPVP8 "), "image/webp");
+        assert_eq!(mime_de(&[0x89, b'P', b'N', b'G', 0x0D]), Some("image/png"));
+        assert_eq!(mime_de(&[0xFF, 0xD8, 0xFF, 0xE0]), Some("image/jpeg"));
+        assert_eq!(mime_de(b"GIF89a..."), Some("image/gif"));
+        assert_eq!(mime_de(b"BM..."), Some("image/bmp"));
+        assert_eq!(mime_de(b"RIFF\0\0\0\0WEBPVP8 "), Some("image/webp"));
     }
 
     #[test]
     fn un_svg_se_reconoce_con_y_sin_declaracion_xml() {
-        assert_eq!(mime_de(br#"<svg xmlns="http://www.w3.org/2000/svg"></svg>"#), "image/svg+xml");
-        assert_eq!(
-            mime_de(br#"<?xml version="1.0"?><svg xmlns="x"></svg>"#),
-            "image/svg+xml"
-        );
-        assert_eq!(mime_de(b"\n  <!-- una foto --> <svg></svg>"), "image/svg+xml");
+        assert_eq!(mime_de(br#"<svg xmlns="http://www.w3.org/2000/svg"></svg>"#), Some("image/svg+xml"));
+        assert_eq!(mime_de(br#"<?xml version="1.0"?><svg xmlns="x"></svg>"#), Some("image/svg+xml"));
+        assert_eq!(mime_de(b"\n  <!-- una foto --> <svg></svg>"), Some("image/svg+xml"));
     }
 
     #[test]
-    fn un_riff_que_no_es_webp_no_se_declara_webp() {
+    fn un_riff_que_no_es_webp_no_se_declara_imagen() {
         // Un WAV empieza con RIFF y no es una imagen.
-        assert_eq!(mime_de(b"RIFF\0\0\0\0WAVEfmt "), "image/png");
+        assert_eq!(mime_de(b"RIFF\0\0\0\0WAVEfmt "), None);
+    }
+
+    #[test]
+    fn lo_que_no_se_reconoce_no_se_declara_png() {
+        // Declarar cualquier cosa como PNG hacía que un `.face` dañado se aceptara
+        // igual, y con él aceptado se dejaba de buscar: un `.face.icon` bueno o el
+        // avatar del sistema quedaban tapados por un archivo que no se dibuja.
+        assert_eq!(mime_de(b"esto es texto, no una imagen"), None);
+        assert_eq!(mime_de(&[0x00, 0x01, 0x02, 0x03]), None);
     }
 
     #[test]
     fn unos_bytes_sueltos_no_hacen_panicar_al_olfateo() {
         // El archivo puede estar truncado o vacío, y esto corre al arrancar el
         // escritorio: un panic acá es un panel que no abre.
-        assert_eq!(mime_de(b""), "image/png");
-        assert_eq!(mime_de(b"R"), "image/png");
-        assert_eq!(mime_de(&[0x89]), "image/png");
-        assert_eq!(mime_de(&[0xFF, 0xD8]), "image/png");
-        assert_eq!(mime_de(&[0xFF; 3]), "image/png");
+        assert_eq!(mime_de(b""), None);
+        assert_eq!(mime_de(b"R"), None);
+        assert_eq!(mime_de(&[0x89]), None);
+        assert_eq!(mime_de(&[0xFF, 0xD8]), None);
+        assert_eq!(mime_de(&[0xFF; 3]), None);
+    }
+
+    #[test]
+    fn un_avatar_ilegible_no_tapa_al_siguiente() {
+        // El caso completo del arreglo: un `.face` que no es una imagen se saltea y
+        // se sigue con el que sí lo es.
+        let base = escenario("ilegible");
+        let roto = base.join("roto.png");
+        std::fs::write(&roto, b"no soy una imagen, aunque me llame .png").unwrap();
+        let bueno = base.join("bueno.png");
+        std::fs::write(&bueno, PNG).unwrap();
+
+        let url = avatar_de(&[roto, bueno], LIMITE_AVATAR).expect("cae al siguiente");
+        assert!(url.starts_with("data:image/png;base64,"), "{url}");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn el_limite_se_aplica_al_leer_y_no_solo_con_metadata() {
+        // `metadata` y `read` miran el archivo en momentos distintos: si crece en el
+        // medio se leería y codificaría más que el límite, y el tope de memoria y de
+        // tamaño del mensaje dejaría de existir.
+        let base = escenario("limite-al-leer");
+        let grande = base.join("grande.png");
+        let mut datos = PNG.to_vec();
+        datos.resize(200, 0);
+        std::fs::write(&grande, &datos).unwrap();
+
+        assert_eq!(avatar_de(std::slice::from_ref(&grande), 100), None, "no entra en 100");
+        assert!(avatar_de(&[grande], 200).is_some(), "en 200 sí");
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
