@@ -19,3 +19,18 @@ jobs:
     permissions:
       contents: read
     uses: Vasak-OS/.github/.github/workflows/app.yml@main
+
+  # La publicación, también compartida. Va después de los chequeos y sólo en
+  # `main`: publicar algo que no pasó las comprobaciones es peor que no
+  # publicar, y de crates.io no se puede borrar una versión, sólo retirarla.
+  #
+  # No hace falta acordarse de nada: el flujo mira si la versión del manifiesto
+  # está en el registro y sube sólo si falta. Un push que no toca la versión no
+  # hace nada.
+  publicar:
+    needs: app
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    uses: Vasak-OS/.github/.github/workflows/publicar-plugin.yml@main
+    secrets: inherit
