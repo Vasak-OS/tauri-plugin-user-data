@@ -33,4 +33,10 @@ jobs:
     permissions:
       contents: read
     uses: Vasak-OS/.github/.github/workflows/publicar-plugin.yml@main
-    secrets: inherit
+    # Los dos secretos por nombre y no `inherit`: `inherit` le entrega al flujo
+    # llamado todo lo que este repositorio tenga, y lo que necesita para
+    # publicar son estos dos. Si mañana el compartido cambia, lo que puede ver
+    # sigue siendo esto.
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
