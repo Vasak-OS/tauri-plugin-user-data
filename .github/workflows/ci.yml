@@ -19,6 +19,11 @@ jobs:
     permissions:
       contents: read
     uses: Vasak-OS/.github/.github/workflows/app.yml@main
+    # Sólo el token de SonarQube Cloud, y por nombre: `secrets: inherit`
+    # le daría también el de crates.io y el de npm a un trabajo que
+    # instala dependencias de terceros.
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   # La publicación, también compartida. Va después de los chequeos y sólo en
   # `main`: publicar algo que no pasó las comprobaciones es peor que no
