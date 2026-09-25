@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-user-data"
-version = "2.1.0"
+version = "2.1.1"
 authors = ["Joaquin (Pato) Decima <jdecima@vasak.net.ar>", "Vasak Group"]
 description = "User Data API for Tauri aplications (Created for VasakOS)"
 edition = "2021"
