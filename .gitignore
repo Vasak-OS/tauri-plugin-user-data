@@ -11,8 +11,11 @@ yarn.lock
 /.tauri
 /target
 
-# Cargo.lock is intentionally tracked: the plugin is compiled into VasakOS apps,
-# so pinning transitive dependency versions keeps builds reproducible (Sonar text:S8570).
+# Cargo.lock is intentionally tracked so that a build of this crate on its own
+# (`cargo build` here, `cargo install`) resolves the same versions every time.
+# It does not pin what a consuming application builds: that is the application's
+# own Cargo.lock, which is where a VasakOS app pins and maintains its
+# dependency versions.
 node_modules/
 
 dist-js

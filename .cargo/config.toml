@@ -1,0 +1,14 @@
+# Que el lockfile respete el MSRV declarado en Cargo.toml.
+#
+# `rust-version` dice cuál es la versión mínima de Rust que el crate dice
+# soportar, pero el resolver por omisión ignora ese dato: `cargo generate-lockfile`
+# se lleva la última versión semver-compatible de cada dependencia, y varias ya
+# exigen Rust más nuevo. El resultado es un lockfile que rompe el MSRV que el
+# propio manifiesto declara.
+#
+# Con `fallback`, cuando la última versión de una dependencia no entra en el
+# MSRV, el resolver baja a la última que sí entra en vez de aceptarla.
+#
+# Sin esto, regenerar el lock vuelve a romper el MSRV en silencio.
+[resolver]
+incompatible-rust-versions = "fallback"
