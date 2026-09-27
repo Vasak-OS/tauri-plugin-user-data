@@ -19,6 +19,20 @@ jobs:
     permissions:
       contents: read
     uses: Vasak-OS/.github/.github/workflows/app.yml@main
+    with:
+      # Las 21 pruebas de Rust de `tauri-plugin-user-data` estaban escritas y no las corría
+      # nadie: este repositorio no pasaba `pruebas_rust` al flujo compartido, así
+      # que ningún pull request las ejecutaba. No es que fallen; es que nadie las
+      # miraba, que es peor.
+      #
+      # La lista de paquetes es la de este grafo, no la de Tauri: son los
+      # `Depends` de `libwebkit2gtk-4.1-dev` más el compilador de C, que necesitan
+      # los crates que traen código en C. Que un `.pc` falte no se ve como un
+      # `.pc` que falta: los `build.rs` de los crates `-sys` llaman a
+      # `process::exit(1)`, así que se lee como un crate que no compila, a mitad
+      # del grafo y muy lejos de la causa.
+      pruebas_rust: -p tauri-plugin-user-data
+      paquetes_rust: libwebkit2gtk-4.1-dev build-essential
     # Sólo el token de SonarQube Cloud, y por nombre: `secrets: inherit`
     # le daría también el de crates.io y el de npm a un trabajo que
     # instala dependencias de terceros.
